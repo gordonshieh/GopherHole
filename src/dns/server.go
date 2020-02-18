@@ -1,4 +1,4 @@
-package main
+package dns
 
 import (
 	"net"
@@ -12,6 +12,15 @@ var recordsA map[string]string = make(map[string]string)
 var recordsAAAA map[string]string = make(map[string]string)
 
 const upstreamDNSHost = "1.1.1.1:53"
+
+func find(slice []string, val string) (int, bool) {
+	for i, item := range slice {
+		if item == val {
+			return i, true
+		}
+	}
+	return -1, false
+}
 
 func toDNSPacket(data []byte) *layers.DNS {
 	packet := gopacket.NewPacket(data, layers.LayerTypeDNS, gopacket.Default)
@@ -42,7 +51,8 @@ func createDNSAnswerAAAA(name, ip string) layers.DNSResourceRecord {
 	return dnsAnswer
 }
 
-func main() {
+// Server for DNS requests
+func Server(blocklist []string) {
 	addr := net.UDPAddr{
 		Port: 8090,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -62,7 +72,7 @@ func main() {
 		question := dnsPacket.Questions[0]
 		requestType := question.Type
 		name := string(question.Name)
-
+		_, block := find(blocklist, name)
 		var cache map[string]string
 		var packetGenFunction func(a, b string) layers.DNSResourceRecord
 
@@ -77,12 +87,33 @@ func main() {
 			continue
 		}
 
+		if block {
+			dnsPacket.Answers = nil
+			dnsPacket.ANCount = 0
+
+			dnsPacket.QR = true
+			dnsPacket.OpCode = layers.DNSOpCodeNotify
+			dnsPacket.AA = true
+			dnsPacket.ResponseCode = layers.DNSResponseCodeNoErr
+
+			buf := gopacket.NewSerializeBuffer()
+			_ = dnsPacket.SerializeTo(buf, gopacket.SerializeOptions{})
+			u.WriteTo(buf.Bytes(), clientAddr)
+			continue
+		}
+
 		ip, exists := cache[name]
 		if exists {
-			answer := packetGenFunction(name, ip)
-			dnsPacket.Answers = append(dnsPacket.Answers, answer)
+			// handle non-existing server as an empty string
+			if len(ip) > 0 {
+				answer := packetGenFunction(name, ip)
+				dnsPacket.Answers = append(dnsPacket.Answers, answer)
+				dnsPacket.ANCount = 1
+			} else {
+				dnsPacket.Answers = nil
+				dnsPacket.ANCount = 0
+			}
 			dnsPacket.QR = true
-			dnsPacket.ANCount = 1
 			dnsPacket.OpCode = layers.DNSOpCodeNotify
 			dnsPacket.AA = true
 			dnsPacket.ResponseCode = layers.DNSResponseCodeNoErr
@@ -108,9 +139,16 @@ func main() {
 				dnsResponse = tmp[:n]
 			}
 			dnsResponsePacket := toDNSPacket(dnsResponse)
-			cache[name] = dnsResponsePacket.Answers[0].IP.String()
+			answers := dnsResponsePacket.Answers
+			if len(answers) > 0 {
+				cache[name] = answers[0].IP.String()
+			} else {
+				// Store a non-existing server as an empty string
+				cache[name] = ""
+			}
 			u.WriteTo(dnsResponse, clientAddr)
 		}
 
 	}
+
 }
