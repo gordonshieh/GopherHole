@@ -6,7 +6,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// Blocklist object for managing the DNS blocklist in a sqlite database
 type Blocklist struct {
 	_db *sql.DB
 }
@@ -15,9 +14,18 @@ type Blocklist struct {
 // Initializes the db if not exists in the same cwd of the exectuable
 func GetDatabase() *Blocklist {
 	database, _ := sql.Open("sqlite3", "data.db")
-	statement, _ := database.Prepare(`CREATE TABLE IF NOT EXISTS
-                                      blocklist (hostname TEXT PRIMARY KEY, ip TEXT)`)
-	statement.Exec()
+	blocklistStatement, _ := database.Prepare(`CREATE TABLE IF NOT EXISTS
+											   blocklist (hostname TEXT PRIMARY KEY,
+														  ip TEXT)`)
+	blocklistStatement.Exec()
+
+	sourcesStatement, err := database.Prepare(`CREATE TABLE IF NOT EXISTS
+											   sources (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+														source TEXT UNIQUE)`)
+	if err != nil {
+		panic(err)
+	}
+	sourcesStatement.Exec()
 	return &Blocklist{database}
 }
 
@@ -39,4 +47,24 @@ func (bl *Blocklist) ShouldBlockHost(host string) bool {
 	var ip string
 	err := row.Scan(&ip)
 	return err == nil
+}
+
+func (bl *Blocklist) GetBlocklists() []string {
+	rows, _ := bl._db.Query(`SELECT source FROM sources`)
+	defer rows.Close()
+
+	sources := make([]string, 0)
+	for rows.Next() {
+		var source string
+		rows.Scan(&source)
+		sources = append(sources, source)
+	}
+	return sources
+}
+
+func (bl *Blocklist) AddBlocklist(source string) {
+	statement, _ := bl._db.Prepare(`INSERT OR IGNORE INTO
+									sources (source)
+                                    VALUES (?)`)
+	statement.Exec(source)
 }

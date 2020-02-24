@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"blocklist"
 	"net"
 	"time"
 
@@ -52,7 +53,7 @@ func createDNSAnswerAAAA(name, ip string) layers.DNSResourceRecord {
 }
 
 // Server for DNS requests
-func Server(blocklist []string) {
+func Server(blocklist *blocklist.Blocklist) {
 	addr := net.UDPAddr{
 		Port: 8090,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -72,7 +73,8 @@ func Server(blocklist []string) {
 		question := dnsPacket.Questions[0]
 		requestType := question.Type
 		name := string(question.Name)
-		_, block := find(blocklist, name)
+		block := blocklist.ShouldBlockHost(name)
+
 		var cache map[string]string
 		var packetGenFunction func(a, b string) layers.DNSResourceRecord
 
