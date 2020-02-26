@@ -19,13 +19,15 @@ func GetDatabase() *Blocklist {
 														  ip TEXT)`)
 	blocklistStatement.Exec()
 
-	sourcesStatement, err := database.Prepare(`CREATE TABLE IF NOT EXISTS
-											   sources (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-														source TEXT UNIQUE)`)
-	if err != nil {
-		panic(err)
-	}
+	sourcesStatement, _ := database.Prepare(`CREATE TABLE IF NOT EXISTS
+											 sources (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+											  		  source TEXT UNIQUE)`)
 	sourcesStatement.Exec()
+	// type is an int because gopacket.dns.DNSType is defined as uint16
+	historyStatement, _ := database.Prepare(`CREATE TABLE IF NOT EXISTS
+											  history (type INTEGER, source TEXT, 
+													   host TEXT, timestamp DATE, block BOOLEAN)`)
+	historyStatement.Exec()
 	return &Blocklist{database}
 }
 
@@ -65,6 +67,32 @@ func (bl *Blocklist) GetBlocklists() []string {
 func (bl *Blocklist) AddBlocklist(source string) {
 	statement, _ := bl._db.Prepare(`INSERT OR IGNORE INTO
 									sources (source)
-                                    VALUES (?)`)
+									VALUES (?)`)
 	statement.Exec(source)
+}
+
+func (bl *Blocklist) RecordHistory(history *HistoryEntry) {
+	statement, _ := bl._db.Prepare(`INSERT INTO history
+									(type, source, host, timestamp, block)
+									VALUES (?, ?, ?, ?, ?)`)
+	statement.Exec(history.ResourceType, history.Source, history.Host,
+		history.Timestamp.Unix(), history.Block)
+}
+
+func (bl *Blocklist) GetHistory() []HistoryEntry {
+
+	rows, _ := bl._db.Query(`SELECT type, source, host, timestamp, block
+							FROM history LIMIT 100`)
+	defer rows.Close()
+
+	entries := make([]HistoryEntry, 0)
+	for rows.Next() {
+		var entry HistoryEntry
+		err := rows.Scan(&entry.ResourceType, &entry.Source, &entry.Host, &entry.Timestamp, &entry.Block)
+		if err != nil {
+			panic(err)
+		}
+		entries = append(entries, entry)
+	}
+	return entries
 }

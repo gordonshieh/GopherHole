@@ -53,7 +53,7 @@ func createDNSAnswerAAAA(name, ip string) layers.DNSResourceRecord {
 }
 
 // Server for DNS requests
-func Server(blocklist *blocklist.Blocklist) {
+func Server(bl *blocklist.Blocklist) {
 	addr := net.UDPAddr{
 		Port: 8090,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -73,7 +73,7 @@ func Server(blocklist *blocklist.Blocklist) {
 		question := dnsPacket.Questions[0]
 		requestType := question.Type
 		name := string(question.Name)
-		block := blocklist.ShouldBlockHost(name)
+		block := bl.ShouldBlockHost(name)
 
 		var cache map[string]string
 		var packetGenFunction func(a, b string) layers.DNSResourceRecord
@@ -101,6 +101,7 @@ func Server(blocklist *blocklist.Blocklist) {
 			buf := gopacket.NewSerializeBuffer()
 			_ = dnsPacket.SerializeTo(buf, gopacket.SerializeOptions{})
 			u.WriteTo(buf.Bytes(), clientAddr)
+			bl.RecordHistory(&blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), true})
 			continue
 		}
 

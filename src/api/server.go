@@ -19,6 +19,12 @@ func getRoot(c echo.Context) error {
 	return c.JSONBlob(http.StatusOK, bytes)
 }
 
+func getHistory(c echo.Context) error {
+	db := c.(*DBContext)
+	bytes, _ := json.Marshal(db.DB.GetHistory())
+	return c.JSONBlob(http.StatusOK, bytes)
+}
+
 func postNewBlocklist(c echo.Context) (err error) {
 	source := c.FormValue("source")
 	db := c.(*DBContext)
@@ -37,5 +43,6 @@ func StartAPIServer(bl *blocklist.Blocklist) {
 
 	e.GET("/", getRoot)
 	e.POST("/add", postNewBlocklist)
+	e.GET("/history", getHistory)
 	e.Logger.Fatal(e.Start(":1323"))
 }
