@@ -9,8 +9,8 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-var recordsA map[string]string = make(map[string]string)
-var recordsAAAA map[string]string = make(map[string]string)
+var recordsA map[string][]layers.DNSResourceRecord = make(map[string][]layers.DNSResourceRecord)
+var recordsAAAA map[string][]layers.DNSResourceRecord = make(map[string][]layers.DNSResourceRecord)
 
 const upstreamDNSHost = "1.1.1.1:53"
 
@@ -28,28 +28,6 @@ func toDNSPacket(data []byte) *layers.DNS {
 	dnsLayer := packet.Layer(layers.LayerTypeDNS)
 	dnsPacket, _ := dnsLayer.(*layers.DNS)
 	return dnsPacket
-}
-
-func createDNSAnswerA(name, ip string) layers.DNSResourceRecord {
-	var dnsAnswer layers.DNSResourceRecord
-	dnsAnswer.Type = layers.DNSTypeA
-	dnsAnswer.Name = []byte(name)
-	dnsAnswer.Class = layers.DNSClassIN
-
-	a, _, _ := net.ParseCIDR(ip + "/24")
-	dnsAnswer.IP = a
-	return dnsAnswer
-}
-
-func createDNSAnswerAAAA(name, ip string) layers.DNSResourceRecord {
-	var dnsAnswer layers.DNSResourceRecord
-	dnsAnswer.Type = layers.DNSTypeAAAA
-	dnsAnswer.Name = []byte(name)
-	dnsAnswer.Class = layers.DNSClassIN
-
-	a, _, _ := net.ParseCIDR(ip + "/32")
-	dnsAnswer.IP = a
-	return dnsAnswer
 }
 
 // Server for DNS requests
@@ -75,16 +53,12 @@ func Server(bl *blocklist.Blocklist) {
 		name := string(question.Name)
 		block := bl.ShouldBlockHost(name)
 
-		var cache map[string]string
-		var packetGenFunction func(a, b string) layers.DNSResourceRecord
-
+		var cache map[string][]layers.DNSResourceRecord
 		switch requestType {
 		case layers.DNSTypeA:
 			cache = recordsA
-			packetGenFunction = createDNSAnswerA
 		case layers.DNSTypeAAAA:
 			cache = recordsAAAA
-			packetGenFunction = createDNSAnswerAAAA
 		default:
 			continue
 		}
@@ -105,17 +79,10 @@ func Server(bl *blocklist.Blocklist) {
 			continue
 		}
 
-		ip, exists := cache[name]
+		answers, exists := cache[name]
 		if exists {
-			// handle non-existing server as an empty string
-			if len(ip) > 0 {
-				answer := packetGenFunction(name, ip)
-				dnsPacket.Answers = append(dnsPacket.Answers, answer)
-				dnsPacket.ANCount = 1
-			} else {
-				dnsPacket.Answers = nil
-				dnsPacket.ANCount = 0
-			}
+			dnsPacket.Answers = answers
+			dnsPacket.ANCount = uint16(len(answers))
 			dnsPacket.QR = true
 			dnsPacket.OpCode = layers.DNSOpCodeNotify
 			dnsPacket.AA = true
@@ -143,12 +110,7 @@ func Server(bl *blocklist.Blocklist) {
 			}
 			dnsResponsePacket := toDNSPacket(dnsResponse)
 			answers := dnsResponsePacket.Answers
-			if len(answers) > 0 {
-				cache[name] = answers[0].IP.String()
-			} else {
-				// Store a non-existing server as an empty string
-				cache[name] = ""
-			}
+			cache[name] = answers
 			u.WriteTo(dnsResponse, clientAddr)
 		}
 
