@@ -82,7 +82,7 @@ func (bl *Blocklist) RecordHistory(history *HistoryEntry) {
 func (bl *Blocklist) GetHistory() []HistoryEntry {
 
 	rows, _ := bl._db.Query(`SELECT type, source, host, timestamp, block
-							FROM history LIMIT 100`)
+							FROM history ORDER BY timestamp DESC LIMIT 100`)
 	defer rows.Close()
 
 	entries := make([]HistoryEntry, 0)

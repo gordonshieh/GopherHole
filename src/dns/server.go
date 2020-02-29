@@ -33,7 +33,7 @@ func toDNSPacket(data []byte) *layers.DNS {
 // Server for DNS requests
 func Server(bl *blocklist.Blocklist) {
 	addr := net.UDPAddr{
-		Port: 8090,
+		Port: 53,
 		IP:   net.ParseIP("0.0.0.0"),
 	}
 	u, _ := net.ListenUDP("udp", &addr)
