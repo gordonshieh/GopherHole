@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
+	"golang.org/x/net/websocket"
 )
 
 type DBContext struct {
@@ -33,7 +34,27 @@ func postNewBlocklist(c echo.Context) (err error) {
 	return c.NoContent(http.StatusCreated)
 }
 
-func StartAPIServer(bl *blocklist.Blocklist) {
+func historyStreamer(blockStream chan blocklist.HistoryEntry) func(echo.Context) error {
+
+	return func(c echo.Context) error {
+		websocket.Handler(func(ws *websocket.Conn) {
+			defer ws.Close()
+			for {
+				stream := <-blockStream
+				bytes, _ := json.Marshal(stream)
+				err := websocket.Message.Send(ws, bytes)
+				if err != nil {
+					c.Logger().Error(err)
+					break
+				}
+			}
+		}).ServeHTTP(c.Response(), c.Request())
+		return nil
+	}
+
+}
+
+func StartAPIServer(bl *blocklist.Blocklist, blockStream chan blocklist.HistoryEntry) {
 	e := echo.New()
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -50,5 +71,6 @@ func StartAPIServer(bl *blocklist.Blocklist) {
 	e.GET("/", getRoot)
 	e.POST("/add", postNewBlocklist)
 	e.GET("/history", getHistory)
+	e.GET("/history-stream", historyStreamer(blockStream))
 	e.Logger.Fatal(e.Start(":1323"))
 }

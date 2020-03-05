@@ -31,7 +31,7 @@ func toDNSPacket(data []byte) *layers.DNS {
 }
 
 // Server for DNS requests
-func Server(bl *blocklist.Blocklist) {
+func Server(bl *blocklist.Blocklist, blockStream chan blocklist.HistoryEntry) {
 	addr := net.UDPAddr{
 		Port: 53,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -75,7 +75,9 @@ func Server(bl *blocklist.Blocklist) {
 			buf := gopacket.NewSerializeBuffer()
 			_ = dnsPacket.SerializeTo(buf, gopacket.SerializeOptions{})
 			u.WriteTo(buf.Bytes(), clientAddr)
-			bl.RecordHistory(&blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), true})
+			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), true}
+			go bl.RecordHistory(&blockEntry)
+			blockStream <- blockEntry
 			continue
 		}
 
@@ -91,7 +93,9 @@ func Server(bl *blocklist.Blocklist) {
 			buf := gopacket.NewSerializeBuffer()
 			_ = dnsPacket.SerializeTo(buf, gopacket.SerializeOptions{})
 			u.WriteTo(buf.Bytes(), clientAddr)
-			bl.RecordHistory(&blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), false})
+			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), true}
+			go bl.RecordHistory(&blockEntry)
+			blockStream <- blockEntry
 		} else {
 			var dnsResponse []byte
 			{
@@ -113,7 +117,9 @@ func Server(bl *blocklist.Blocklist) {
 			answers := dnsResponsePacket.Answers
 			cache[name] = answers
 			u.WriteTo(dnsResponse, clientAddr)
-			bl.RecordHistory(&blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), false})
+			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), true}
+			go bl.RecordHistory(&blockEntry)
+			blockStream <- blockEntry
 		}
 
 	}
