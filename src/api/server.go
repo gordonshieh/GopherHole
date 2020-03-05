@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
 )
 
 type DBContext struct {
@@ -40,6 +41,11 @@ func StartAPIServer(bl *blocklist.Blocklist) {
 			return next(cc)
 		}
 	})
+
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"http://localhost:3000"},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+	}))
 
 	e.GET("/", getRoot)
 	e.POST("/add", postNewBlocklist)
