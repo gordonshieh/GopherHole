@@ -3,62 +3,64 @@ package api
 import (
 	"blocklist"
 	"encoding/json"
+	"log"
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
-	"golang.org/x/net/websocket"
 )
 
-type DBContext struct {
+var (
+	upgrader = websocket.Upgrader{}
+)
+
+type CustomContext struct {
 	echo.Context
-	DB *blocklist.Blocklist
+	DB   *blocklist.Blocklist
+	pool *WebSocketPool
 }
 
 func getRoot(c echo.Context) error {
-	db := c.(*DBContext)
+	db := c.(*CustomContext)
 	bytes, _ := json.Marshal(db.DB.GetBlocklists())
 	return c.JSONBlob(http.StatusOK, bytes)
 }
 
 func getHistory(c echo.Context) error {
-	db := c.(*DBContext)
+	db := c.(*CustomContext)
 	bytes, _ := json.Marshal(db.DB.GetHistory())
 	return c.JSONBlob(http.StatusOK, bytes)
 }
 
 func postNewBlocklist(c echo.Context) (err error) {
 	source := c.FormValue("source")
-	db := c.(*DBContext)
+	db := c.(*CustomContext)
 	db.DB.AddBlocklist(source)
 	return c.NoContent(http.StatusCreated)
 }
 
-func historyStreamer(blockStream chan blocklist.HistoryEntry) func(echo.Context) error {
-
-	return func(c echo.Context) error {
-		websocket.Handler(func(ws *websocket.Conn) {
-			defer ws.Close()
-			for {
-				stream := <-blockStream
-				bytes, _ := json.Marshal(stream)
-				err := websocket.Message.Send(ws, bytes)
-				if err != nil {
-					c.Logger().Error(err)
-					break
-				}
-			}
-		}).ServeHTTP(c.Response(), c.Request())
-		return nil
+func historyStreamer(c echo.Context) (err error) {
+	ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+	if err != nil {
+		log.Println(err)
+		return
 	}
-
+	pool := c.(*CustomContext).pool
+	client := toPooledClient(ws, pool)
+	go client.SendToClient()
+	pool.register <- &client
+	return c.NoContent(http.StatusCreated)
 }
 
-func StartAPIServer(bl *blocklist.Blocklist, blockStream chan blocklist.HistoryEntry) {
+func StartAPIServer(bl *blocklist.Blocklist, blockStream chan []byte) {
 	e := echo.New()
+	pool := newWebSocketPool(blockStream)
+	go pool.run()
+	// Attach context for DB access object
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			cc := &DBContext{c, bl}
+			cc := &CustomContext{c, bl, pool}
 			return next(cc)
 		}
 	})
@@ -71,6 +73,6 @@ func StartAPIServer(bl *blocklist.Blocklist, blockStream chan blocklist.HistoryE
 	e.GET("/", getRoot)
 	e.POST("/add", postNewBlocklist)
 	e.GET("/history", getHistory)
-	e.GET("/history-stream", historyStreamer(blockStream))
+	e.GET("/history-stream", historyStreamer)
 	e.Logger.Fatal(e.Start(":1323"))
 }

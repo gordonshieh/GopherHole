@@ -1,6 +1,7 @@
 package blocklist
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -15,4 +16,9 @@ type HistoryEntry struct {
 
 func (he *HistoryEntry) String() string {
 	return fmt.Sprintf("%v: %v", he.Source, he.Host)
+}
+
+func (he *HistoryEntry) JSONBytes() []byte {
+	bytes, _ := json.Marshal(*he)
+	return bytes
 }

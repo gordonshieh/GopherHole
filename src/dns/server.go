@@ -31,9 +31,9 @@ func toDNSPacket(data []byte) *layers.DNS {
 }
 
 // Server for DNS requests
-func Server(bl *blocklist.Blocklist, blockStream chan blocklist.HistoryEntry) {
+func Server(bl *blocklist.Blocklist, blockStream chan []byte) {
 	addr := net.UDPAddr{
-		Port: 53,
+		Port: 8097,
 		IP:   net.ParseIP("0.0.0.0"),
 	}
 	u, _ := net.ListenUDP("udp", &addr)
@@ -77,7 +77,7 @@ func Server(bl *blocklist.Blocklist, blockStream chan blocklist.HistoryEntry) {
 			u.WriteTo(buf.Bytes(), clientAddr)
 			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), true}
 			go bl.RecordHistory(&blockEntry)
-			blockStream <- blockEntry
+			blockStream <- blockEntry.JSONBytes()
 			continue
 		}
 
@@ -95,7 +95,7 @@ func Server(bl *blocklist.Blocklist, blockStream chan blocklist.HistoryEntry) {
 			u.WriteTo(buf.Bytes(), clientAddr)
 			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), true}
 			go bl.RecordHistory(&blockEntry)
-			blockStream <- blockEntry
+			blockStream <- blockEntry.JSONBytes()
 		} else {
 			var dnsResponse []byte
 			{
@@ -119,7 +119,7 @@ func Server(bl *blocklist.Blocklist, blockStream chan blocklist.HistoryEntry) {
 			u.WriteTo(dnsResponse, clientAddr)
 			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), true}
 			go bl.RecordHistory(&blockEntry)
-			blockStream <- blockEntry
+			blockStream <- blockEntry.JSONBytes()
 		}
 
 	}

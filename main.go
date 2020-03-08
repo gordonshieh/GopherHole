@@ -27,10 +27,9 @@ func importBlocklistFromHTTP(db *blocklist.Blocklist) {
 
 func main() {
 	db := blocklist.GetDatabase()
-	blockStreamer := make(chan blocklist.HistoryEntry)
-	db.AddBlocklist("https://raw.githubusercontent.com/hectorm/hmirror/master/data/adaway.org/list.txt")
+	dnsActivityChan := make(chan []byte)
 	go importBlocklistFromHTTP(db)
 	println("server started")
-	go dns.Server(db, blockStreamer)
-	api.StartAPIServer(db, blockStreamer)
+	go dns.Server(db, dnsActivityChan)
+	api.StartAPIServer(db, dnsActivityChan)
 }
