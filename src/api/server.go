@@ -12,7 +12,11 @@ import (
 )
 
 var (
-	upgrader = websocket.Upgrader{}
+	upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			return origin == "http://localhost:3000"
+		}}
 )
 
 type CustomContext struct {
@@ -41,7 +45,8 @@ func postNewBlocklist(c echo.Context) (err error) {
 }
 
 func historyStreamer(c echo.Context) (err error) {
-	ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+	r := c.Request()
+	ws, err := upgrader.Upgrade(c.Response(), r, nil)
 	if err != nil {
 		log.Println(err)
 		return
