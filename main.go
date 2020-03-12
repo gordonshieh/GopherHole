@@ -1,9 +1,9 @@
 package main
 
 import (
-	"api"
-	"blocklist"
-	"dns"
+	"github.com/gordonshieh94/GopherHole/api"
+	"github.com/gordonshieh94/GopherHole/blocklist"
+	"github.com/gordonshieh94/GopherHole/dns"
 	"io/ioutil"
 	"net/http"
 	"strings"

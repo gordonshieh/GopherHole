@@ -1,7 +1,7 @@
 package api
 
 import (
-	"blocklist"
+	"github.com/gordonshieh94/GopherHole/blocklist"
 	"encoding/json"
 	"log"
 	"net/http"

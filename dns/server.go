@@ -1,7 +1,7 @@
 package dns
 
 import (
-	"blocklist"
+	"github.com/gordonshieh94/GopherHole/blocklist"
 	"net"
 	"time"
 
