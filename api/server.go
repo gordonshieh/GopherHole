@@ -1,10 +1,12 @@
 package api
 
 import (
-	"github.com/gordonshieh94/GopherHole/blocklist"
 	"encoding/json"
 	"log"
 	"net/http"
+
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/gordonshieh94/GopherHole/blocklist"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo"
@@ -15,7 +17,7 @@ var (
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			origin := r.Header.Get("Origin")
-			return origin == "http://localhost:3000"
+			return origin == "http://localhost:1323"
 		}}
 )
 
@@ -71,11 +73,11 @@ func StartAPIServer(bl *blocklist.Blocklist, blockStream chan []byte) {
 	})
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"http://localhost:3000"},
+		AllowOrigins: []string{"http://localhost:1323"},
 		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
 	}))
-
-	e.GET("/", getRoot)
+	assetHandler := http.FileServer(rice.MustFindBox("../ui/build").HTTPBox())
+	e.GET("/*", echo.WrapHandler(assetHandler))
 	e.POST("/add", postNewBlocklist)
 	e.GET("/history", getHistory)
 	e.GET("/history-stream", historyStreamer)
