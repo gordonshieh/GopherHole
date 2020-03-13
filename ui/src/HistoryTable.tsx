@@ -63,7 +63,7 @@ class HistoryTable extends Component<{}, HistoryState> {
 
     render() {
         return (
-            <TableContainer>
+            <TableContainer component={Paper}>
                 <Table>
                     <TableHead>
                         <TableRow>
