@@ -18,6 +18,46 @@ type HistoryState = {
     timerId?: NodeJS.Timeout
 }
 
+function formatDate(date: Date): String {
+    let formatted = String(date.getFullYear());
+    let month = date.getMonth();
+    let day = date.getDate();
+    let hours = date.getHours();
+    let minutes = date.getMinutes();
+    let seconds = date.getSeconds();
+
+    formatted += "-";
+    if (month < 9) {
+        formatted += "0";
+    }
+    formatted += String(month);
+
+    formatted += "-";
+    if (day < 9) {
+        formatted += "0";
+    }
+    formatted += String(day);
+
+    formatted += " ";
+    if (hours < 9) {
+        formatted += "0";
+    }
+    formatted += String(hours);
+
+    formatted += ":";
+    if (minutes < 9) {
+        formatted += "0";
+    }
+    formatted += String(minutes);
+
+    formatted += ":";
+    if (seconds < 9) {
+        formatted += "0";
+    }
+    formatted += String(seconds);
+    return formatted;
+}
+
 class HistoryTable extends Component<{}, HistoryState> {
     ws = new WebSocket('ws://localhost:1323/history-stream');
 
@@ -57,7 +97,7 @@ class HistoryTable extends Component<{}, HistoryState> {
         this.ws.onmessage = (ev: MessageEvent) => {
             let currResults = this.state.items;
             currResults.unshift(JSON.parse(ev.data));
-            this.setState({items: currResults})
+            this.setState({items: currResults.slice(0, 50)})
         };
     }
 
@@ -75,15 +115,17 @@ class HistoryTable extends Component<{}, HistoryState> {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {this.state.items.map(row => (
+                        {this.state.items.map(row => {
+                            let dateObj = new Date(row.timestamp);
+                            return (
                             <TableRow>
-                                <TableCell>{row.timestamp}</TableCell>
+                                <TableCell>{formatDate(dateObj)}</TableCell>
                                 <TableCell>{row.type}</TableCell>
                                 <TableCell>{row.host}</TableCell>
                                 <TableCell>{row.source}</TableCell>
                                 <TableCell>{row.block ? "Blocked" : "Ok"}</TableCell>
-                            </TableRow>
-                        ))}
+                            </TableRow>)
+                        })}
                     </TableBody>
                 </Table>
             </TableContainer>

@@ -1,9 +1,10 @@
 package dns
 
 import (
-	"github.com/gordonshieh94/GopherHole/blocklist"
 	"net"
 	"time"
+
+	"github.com/gordonshieh94/GopherHole/blocklist"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -75,7 +76,7 @@ func Server(bl *blocklist.Blocklist, blockStream chan []byte) {
 			buf := gopacket.NewSerializeBuffer()
 			_ = dnsPacket.SerializeTo(buf, gopacket.SerializeOptions{})
 			u.WriteTo(buf.Bytes(), clientAddr)
-			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), true}
+			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now().UTC(), true}
 			go bl.RecordHistory(&blockEntry)
 			blockStream <- blockEntry.JSONBytes()
 			continue
@@ -93,7 +94,7 @@ func Server(bl *blocklist.Blocklist, blockStream chan []byte) {
 			buf := gopacket.NewSerializeBuffer()
 			_ = dnsPacket.SerializeTo(buf, gopacket.SerializeOptions{})
 			u.WriteTo(buf.Bytes(), clientAddr)
-			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), false}
+			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now().UTC(), false}
 			go bl.RecordHistory(&blockEntry)
 			blockStream <- blockEntry.JSONBytes()
 		} else {
@@ -117,7 +118,7 @@ func Server(bl *blocklist.Blocklist, blockStream chan []byte) {
 			answers := dnsResponsePacket.Answers
 			cache[name] = answers
 			u.WriteTo(dnsResponse, clientAddr)
-			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now(), false}
+			blockEntry := blocklist.HistoryEntry{requestType.String(), clientAddr.String(), name, time.Now().UTC(), false}
 			go bl.RecordHistory(&blockEntry)
 			blockStream <- blockEntry.JSONBytes()
 		}
